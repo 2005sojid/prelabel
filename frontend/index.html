@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prelabel</title>
+<link rel="stylesheet" href="/assets/app.css">
+</head>
+<body>
+
+<aside class="sidebar">
+  <header class="brand"><span class="dot"></span><h1>Prelabel</h1></header>
+
+  <section id="projects-section" hidden>
+    <div class="section-head">
+      <span class="label">Projects</span>
+      <button id="project-new" class="btn btn-mini" title="Create a project from a folder on the server">+ New</button>
+    </div>
+    <div class="card project-list" id="project-list"></div>
+  </section>
+
+  <section>
+    <span class="label">1 · Model</span>
+    <div class="drop" id="model-drop" role="button" tabindex="0" aria-label="Upload a model file">
+      Drop a model file<br><small id="model-formats">.pt .onnx .xml .engine …</small>
+    </div>
+    <small class="hint-text">OpenVINO? Drop the <b>.xml</b> and <b>.bin</b> together.</small>
+  </section>
+
+  <section class="card" id="model-info" hidden>
+    <div class="row"><span class="k">Task</span><span class="v"><span class="pill" id="mi-task"></span></span></div>
+    <div class="row"><span class="k">Format</span><span class="v" id="mi-format"></span></div>
+    <div class="row"><span class="k">Backend</span><span class="v" id="mi-backend"></span></div>
+    <div class="row"><span class="k">Device</span><span class="v" id="mi-device"></span></div>
+    <div class="row"><span class="k">Classes</span><span class="v" id="mi-classes"></span></div>
+    <div class="row"><span class="k">Image size</span><span class="v" id="mi-imgsz"></span></div>
+    <div class="notice notice-warn" id="mi-assumed" hidden>
+      ⚠ Task wasn't stored in this model — assumed <b id="mi-assumed-task">detect</b>. If it's
+      segmentation/pose/classify, results may look wrong. Provide the model's
+      <code>metadata.yaml</code> to fix.
+    </div>
+    <div class="path-box" id="mi-path" title="Path on the server"></div>
+    <button class="btn btn-quiet" id="unload-btn" title="Release the model and free its memory">
+      Unload model
+    </button>
+  </section>
+
+  <section id="device-wrap" hidden>
+    <span class="label">Device</span>
+    <div class="seg" id="device-seg"></div>
+    <button id="bench-btn" class="btn btn-quiet full">⏱ Benchmark (latency vs throughput)</button>
+    <div class="card bench" id="bench-out" hidden></div>
+  </section>
+
+  <section>
+    <span class="label">2 · Image, Video or Batch</span>
+    <div class="drop" id="media-drop" role="button" tabindex="0" aria-label="Upload images or a video">
+      Drop a photo / video<br><small>…or several photos for batch</small>
+    </div>
+    <div class="btn-row">
+      <button id="folder-btn" class="btn btn-quiet">📁 Folder</button>
+      <button id="webcam-btn" class="btn btn-quiet">🎥 Webcam</button>
+    </div>
+  </section>
+
+  <section>
+    <div class="slider-head"><span>Confidence</span><b id="conf-val">50%</b></div>
+    <input type="range" id="conf" min="1" max="99" value="50" aria-label="Confidence threshold">
+  </section>
+
+  <section>
+    <span class="label">Inference options</span>
+    <div class="card options">
+      <label class="option" title="Slice large images and run the model at native resolution on each tile">
+        <input type="checkbox" id="opt-tiled"> Sliced inference
+        <small>finds small objects in large images</small>
+      </label>
+      <label class="option" title="Follow each object across video frames and stamp a stable id on it">
+        <input type="checkbox" id="opt-track"> Track objects in video
+        <small id="opt-track-note">ids are drawn on the rendered clip</small>
+      </label>
+      <label class="option option-text">
+        <span>Only these classes</span>
+        <input type="text" id="opt-classes" placeholder="e.g. 0,2  (empty = all)">
+      </label>
+    </div>
+  </section>
+
+  <section class="grow">
+    <span class="label">Detections</span>
+    <div class="card det-list" id="det-list"><p class="empty">Waiting for input…</p></div>
+  </section>
+
+  <footer class="footer">
+    <kbd>Wheel</kbd> zoom &nbsp; <kbd>Drag</kbd> pan &nbsp; <kbd>R</kbd> reset view<br>
+    Inference runs locally. <code>imgsz</code> is read from the model.
+  </footer>
+</aside>
+
+<main class="viewport" id="viewport">
+  <canvas id="canvas"></canvas>
+  <video id="video" controls hidden></video>
+  <p class="hint" id="hint">Load a model and an image to begin</p>
+  <div class="badge" id="badge" hidden></div>
+  <div class="spinner" id="spinner" hidden>⟳ Running inference…</div>
+  <div class="toast-stack" id="toasts" aria-live="polite"></div>
+
+  <section id="batch-view" hidden>
+    <div id="batch-bar">
+      <span class="stat" id="batch-stat">Batch</span>
+      <input id="batch-search" type="search" placeholder="🔍 filename…" title="Filter by filename">
+      <span class="spacer"></span>
+      <select id="batch-size" title="Thumbnail size">
+        <option value="s">Small</option><option value="m" selected>Medium</option><option value="l">Large</option>
+      </select>
+      <select id="batch-filter" title="Filter">
+        <option value="all">All</option><option value="with">With detections</option><option value="without">Without</option>
+      </select>
+      <select id="batch-sort" title="Sort">
+        <option value="name">Sort: name</option><option value="most">Sort: most detections</option><option value="least">Sort: fewest</option>
+      </select>
+      <button id="batch-cancel" title="Stop processing" hidden>⏹ Stop</button>
+      <div class="dd">
+        <button id="batch-export" class="primary" title="Export annotations">⬇ Export ▾</button>
+        <div id="export-menu" class="dd-menu" hidden></div>
+      </div>
+      <button id="batch-clear" title="Clear batch">✕</button>
+    </div>
+    <div id="batch-progress"><div></div></div>
+    <div id="gallery"></div>
+  </section>
+
+  <section id="project-view" hidden>
+    <div id="project-bar">
+      <div class="project-title">
+        <b id="project-name"></b>
+        <span class="project-source" id="project-source"></span>
+      </div>
+      <span class="project-status" id="project-status"></span>
+      <span class="spacer"></span>
+      <button id="project-run" class="primary">▶ Run</button>
+      <button id="project-close" title="Close this project">✕</button>
+    </div>
+
+    <div id="project-toolbar">
+      <span class="stat" id="project-stat"></span>
+      <input id="project-search" type="search" placeholder="🔍 filename…" title="Filter by path">
+      <select id="project-sort" title="Order">
+        <option value="path">Sort: path</option>
+        <option value="priority">Sort: least confident first</option>
+        <option value="disputed">Sort: biggest disagreement</option>
+        <option value="most">Sort: most detections</option>
+        <option value="least">Sort: fewest detections</option>
+      </select>
+      <select id="project-filter" title="Filter">
+        <option value="all">All</option>
+        <option value="with">With detections</option>
+        <option value="without">Without</option>
+        <option value="disputed">Differs from baseline</option>
+        <option value="agreed">Matches baseline</option>
+        <option value="error">Failed</option>
+      </select>
+      <span class="spacer"></span>
+      <label class="toggle" title="Slice large images and run at native resolution">
+        <input type="checkbox" id="project-tiled"> Tiled
+      </label>
+      <input id="project-classes" type="text" placeholder="classes e.g. 0,2" title="Only these class ids (empty = all)">
+      <select id="project-export-format" title="Export format"></select>
+      <button id="project-export" class="primary" title="Download as a dataset">⬇ Export</button>
+      <button id="project-import" title="Load corrected COCO annotations back in">⬆ Import</button>
+      <button id="project-delete" title="Delete this project">🗑</button>
+    </div>
+
+    <div id="compare-bar">
+      <span class="compare-label">Compare</span>
+      <button id="compare-capture" title="Freeze the current annotations, then run another model to see what changed">
+        📷 Capture baseline
+      </button>
+      <button id="compare-import" title="Load corrected labels as the set to compare against">
+        ⬆ Import as baseline
+      </button>
+      <button id="compare-clear" title="Drop the comparison set" hidden>✕ Clear</button>
+      <label class="toggle" id="compare-overlay-wrap" hidden>
+        <input type="checkbox" id="compare-overlay" checked> Show baseline in lightbox
+      </label>
+      <span class="spacer"></span>
+      <span class="compare-badge" id="compare-badge" hidden></span>
+    </div>
+    <div class="compare-panel" id="compare-panel" hidden></div>
+
+    <div id="train-bar">
+      <span class="compare-label">Retrain</span>
+      <label class="train-field" title="How many passes over the labelled images">
+        epochs <input id="train-epochs" type="number" min="1" max="1000" value="40">
+      </label>
+      <select id="train-source" title="Which set of labels to learn from">
+        <option value="current">from current labels</option>
+        <option value="baseline">from baseline labels</option>
+      </select>
+      <button id="train-start" title="Fine-tune the loaded model on this project's corrected labels">
+        🎓 Fine-tune model
+      </button>
+      <button id="train-cancel" hidden>⏹ Stop training</button>
+      <button id="train-adopt" class="primary" hidden title="Load the retrained weights as the active model">
+        ✓ Adopt &amp; re-run
+      </button>
+      <span class="spacer"></span>
+      <span class="compare-badge" id="train-badge" hidden></span>
+    </div>
+    <div class="compare-panel" id="train-panel" hidden></div>
+
+    <div id="project-progress"><div></div></div>
+    <div id="project-gallery"></div>
+  </section>
+</main>
+
+<div id="folder-dialog" hidden>
+  <div class="dialog">
+    <header class="dialog-head">
+      <b>Choose a folder on the server</b>
+      <span class="dialog-path" id="folder-path"></span>
+    </header>
+    <div class="folder-list" id="folder-list"></div>
+    <footer class="dialog-foot">
+      <input id="folder-name" type="text" placeholder="Project name" aria-label="Project name">
+      <span id="folder-count" class="dialog-count"></span>
+      <span class="spacer"></span>
+      <button id="folder-cancel" class="btn">Cancel</button>
+      <button id="folder-choose" class="btn primary" disabled>Create project</button>
+    </footer>
+  </div>
+</div>
+
+<div id="tooltip" hidden></div>
+
+<div id="lightbox" hidden>
+  <div id="lb-top">
+    <button id="lb-prev" title="Previous (←)">‹</button>
+    <button id="lb-next" title="Next (→)">›</button>
+    <span class="fname" id="lb-name"></span>
+    <span id="lb-meta"></span>
+    <span id="lb-count"></span>
+    <button id="lb-close" title="Close (Esc)">✕</button>
+  </div>
+  <div id="lb-canvas-wrap">
+    <canvas id="lb-canvas"></canvas>
+    <p id="lb-hint">Wheel zoom · drag pan · double-click reset</p>
+  </div>
+</div>
+
+<div id="drop-overlay" hidden>
+  <div class="drop-overlay-inner">
+    <div class="drop-arrow">⬇</div>
+    Drop anywhere — <b>models</b> and <b>photos/videos</b> are detected automatically
+  </div>
+</div>
+
+<script type="module" src="/assets/js/main.js"></script>
+</body>
+</html>

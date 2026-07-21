@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Project storage (uploaded models, media, rendered outputs)
+storage/
+
+# Model weights & media that might sit in the repo root
+*.pt
+*.onnx
+*.engine
+*.tflite
+*.bin
+*.torchscript
+*_openvino_model/
+!requirements.txt
+
+# Tests / tooling
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+
+# Tooling / editors
+.claude/
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Node (frontend has no build step; this is only for `npm test`)
+node_modules/

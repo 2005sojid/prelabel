@@ -1,0 +1,21 @@
+# Runtime dependencies. For development (pytest, ruff) use:  pip install -e ".[dev]"
+# Upper bounds are deliberate: ultralytics and onnxruntime both make breaking
+# changes across majors, and this project pins to their current APIs.
+
+# --- Web server ---
+fastapi>=0.110,<1.0
+uvicorn[standard]>=0.27,<1.0
+python-multipart>=0.0.9      # required by FastAPI for file uploads
+
+# --- Inference backends ---
+ultralytics>=8.1,<9.0        # YOLO models: .pt .onnx OpenVINO .engine .tflite ...
+                             # NOTE: AGPL-3.0. See the licence note in README.
+onnxruntime>=1.16,<2.0       # generic ONNX classifiers
+openvino>=2024.0             # read OpenVINO IR to auto-build metadata.yaml
+lap>=0.5                     # linear assignment for ByteTrack/BoT-SORT video tracking
+# For GPU: swap onnxruntime -> onnxruntime-gpu, and install a CUDA-enabled torch.
+
+# --- Vision / numerics ---
+opencv-python>=4.8,<5.0
+numpy>=1.24,<3.0
+pyyaml>=6.0,<7.0             # synthesise OpenVINO metadata.yaml

@@ -1,0 +1,46 @@
+# Prelabel — CPU by default.
+#
+#   docker compose up --build
+#   open http://127.0.0.1:8000
+#
+# Put the images you want pre-labelled in ./images (or repoint the mount).
+# For GPU, uncomment the `deploy` block and build with the CUDA torch index:
+#   docker compose build --build-arg TORCH_INDEX=https://download.pytorch.org/whl/cu124
+
+services:
+  prelabel:
+    build:
+      context: .
+      args:
+        TORCH_INDEX: ${TORCH_INDEX:-https://download.pytorch.org/whl/cpu}
+    image: prelabel:latest
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      # Folders the server may read datasets from. Inside the container this is
+      # the mount below; the host path is whatever you point it at.
+      PL_DATA_ROOTS: /data/images
+      PL_STORAGE_DIR: /data/storage
+      # Set a token to require authentication. Leave empty for a private machine.
+      PL_AUTH_TOKEN: ${PL_AUTH_TOKEN:-}
+      # Add the origin you serve the UI from, if it is not this container.
+      PL_ALLOWED_ORIGINS: ${PL_ALLOWED_ORIGINS:-}
+    volumes:
+      # Your images, read-only: Prelabel never writes to the dataset.
+      - ./images:/data/images:ro
+      # Projects, results, thumbnails and uploaded models. Persisted so a
+      # restart resumes rather than starts over.
+      - prelabel-storage:/data/storage
+    restart: unless-stopped
+
+    # --- GPU ---------------------------------------------------------------
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+volumes:
+  prelabel-storage:
